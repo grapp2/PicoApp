@@ -8,6 +8,6 @@ namespace PicoApp.ViewModel
 {
     internal class PicoViewModel : ViewModelBase
     {
-
+        
     }
 }

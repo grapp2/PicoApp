@@ -11,7 +11,7 @@
     <Window.DataContext>
         <vm:MainWindowViewModel/>
     </Window.DataContext>
-    <Grid>
+    <StackPanel>
         <ContentControl Content="{Binding PicoViewModel}">
             <ContentControl.Resources>
                 <DataTemplate DataType="{x:Type vm:PicoViewModel}">
@@ -19,5 +19,12 @@
                 </DataTemplate>
             </ContentControl.Resources>
         </ContentControl>
-    </Grid>
+        <ContentControl Content="{Binding DHMViewModel}">
+            <ContentControl.Resources>
+                <DataTemplate DataType="{x:Type vm:DHMViewModel}">
+                    <v:DHMView/>
+                </DataTemplate>
+            </ContentControl.Resources>
+        </ContentControl>
+    </StackPanel>
 </Window>

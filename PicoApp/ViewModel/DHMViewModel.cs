@@ -27,12 +27,12 @@ namespace PicoApp.ViewModel
                 csv.ReadHeader();
                 while (csv.Read())
                 {
-                    var record = new DHMData()
-                    {
-                         = csv.GetField<int>("Id"),
-                        Name = csv.GetField("Name")
-                    };
-                    DHMData.Add();
+                    //var record = new DHMData()
+                    //{
+                    //     = csv.GetField<int>("Id"),
+                    //    Name = csv.GetField("Name")
+                    //};
+                    //DHMData.Add();
                 }
             }
         }

@@ -7,13 +7,36 @@
              xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
              mc:Ignorable="d" >
     <materialDesign:Card>
-        <StackPanel>
-            <Label Content="Pico Scope Automation"/>
-            <StackPanel Orientation="Horizontal">
-                <StackPanel>
-                    <TextBox 
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <StackPanel Grid.Row="0" Grid.RowSpan="2" Grid.Column="0">
+                <Label Content="Pico Scope Automation"/>
+                <StackPanel Orientation="Horizontal">
+                    <StackPanel>
+                        <TextBox />
+                        <ListView ItemsSource="{Binding PicoData}"/>
+                    </StackPanel>
                 </StackPanel>
+                <Button/>
+                <Button/>
+                <Button/>
+                <Button/>
             </StackPanel>
-        </StackPanel>
+            <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal">
+                <Label Content="Pico Scope Automation"/>
+                <Button/>
+                <Button/>
+                <Button/>
+                <Button/>
+            </StackPanel>
+        </Grid>
+
     </materialDesign:Card>
 </UserControl>
