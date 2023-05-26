@@ -13,10 +13,10 @@ namespace PicoApp.ViewModel
 {
     internal class DHMViewModel : ViewModelBase
     {
-        private ObservableCollection<DHMData> _dhmData;
+        private DhmData dhmData;
         public DHMViewModel()
         {
-            DHMData = new ObservableCollection<DHMData>();
+            DHMData = new DhmData();
         }
         private void ParseDHMFile()
         {
@@ -36,10 +36,10 @@ namespace PicoApp.ViewModel
                 }
             }
         }
-        public ObservableCollection<DHMData> DHMData
+        public DhmData DHMData
         {
-            get { return _dhmData; }
-            set { _dhmData = value; OnPropertyChanged(); }
+            get { return dhmData; }
+            set { dhmData = value; OnPropertyChanged(); }
         }
     }
 }

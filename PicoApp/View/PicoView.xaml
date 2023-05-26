@@ -17,23 +17,43 @@
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
             <StackPanel Grid.Row="0" Grid.RowSpan="2" Grid.Column="0">
-                <Label Content="Pico Scope Automation"/>
+                <Label Content="Pico Scope Automation" FontSize="20"/>
                 <StackPanel Orientation="Horizontal">
-                    <StackPanel>
-                        <TextBox />
-                        <ListView ItemsSource="{Binding PicoData}"/>
-                    </StackPanel>
+                    <ListView ItemsSource="{Binding PicoData}">
+                        <ListView.View>
+                            <GridView>
+                                <GridViewColumn Header="Voltage RMS (V)" Width="auto">
+                                    <GridViewColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding VoltageRMS}" />
+                                        </DataTemplate>
+                                    </GridViewColumn.CellTemplate>
+                                </GridViewColumn>
+                                <GridViewColumn Header="Current RMS (A)" Width="auto">
+                                    <GridViewColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding CurrentRMS}" />
+                                        </DataTemplate>
+                                    </GridViewColumn.CellTemplate>
+                                </GridViewColumn>
+                                <GridViewColumn Header="Phase" Width="auto">
+                                    <GridViewColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding Phase}" />
+                                        </DataTemplate>
+                                    </GridViewColumn.CellTemplate>
+                                </GridViewColumn>
+                                <GridViewColumn Header="Power" Width="auto">
+                                    <GridViewColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding Power}" />
+                                        </DataTemplate>
+                                    </GridViewColumn.CellTemplate>
+                                </GridViewColumn>
+                            </GridView>
+                        </ListView.View>
+                    </ListView>
                 </StackPanel>
-                <Button/>
-                <Button/>
-                <Button/>
-                <Button/>
-            </StackPanel>
-            <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal">
-                <Label Content="Pico Scope Automation"/>
-                <Button/>
-                <Button/>
-                <Button/>
                 <Button/>
             </StackPanel>
         </Grid>
