@@ -13,30 +13,33 @@ namespace PicoApp.ViewModel
 {
     internal class DHMViewModel : ViewModelBase
     {
-        private DhmData dhmData;
+        private ObservableCollection<GroupDhmData> dhmData;
         public DHMViewModel()
         {
-            DHMData = new DhmData();
+            DHMData = new ObservableCollection<GroupDhmData>();
+            ParseDHMFile();
         }
         private void ParseDHMFile()
         {
-            using (var reader = new StreamReader("path\\to\\file.csv"))
+            GroupDhmData groupDhmData = new GroupDhmData();
+            using (var reader = new StreamReader(@"C:\\Users\\JoseSalazar\\OneDrive - Pneuma Respiratory\\Project Development\\Product Development\\Template\\FrequencyDisplacement\\100hz.txt"))
             using (var csv = new CsvReader(reader, CultureInfo.InvariantCulture))
             {
                 csv.Read();
                 csv.ReadHeader();
                 while (csv.Read())
                 {
-                    //var record = new DHMData()
-                    //{
-                    //     = csv.GetField<int>("Id"),
-                    //    Name = csv.GetField("Name")
-                    //};
-                    //DHMData.Add();
+                    var record = new DhmData()
+                    {
+                        Frequency = csv.GetField<double>(" Frequency[Hz]"),
+                        Displacement = csv.GetField<double>(" Region4[nm]")
+                    };
+                    groupDhmData.RawData.Add(record);
                 }
             }
+            DHMData.Add(groupDhmData);
         }
-        public DhmData DHMData
+        public ObservableCollection<GroupDhmData> DHMData
         {
             get { return dhmData; }
             set { dhmData = value; OnPropertyChanged(); }
