@@ -8,6 +8,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Windows;
 
 namespace PicoApp.ViewModel
 {
@@ -22,22 +23,29 @@ namespace PicoApp.ViewModel
         private void ParseDHMFile()
         {
             GroupDhmData groupDhmData = new GroupDhmData();
-            using (var reader = new StreamReader(@"C:\\Users\\JoseSalazar\\OneDrive - Pneuma Respiratory\\Project Development\\Product Development\\Template\\FrequencyDisplacement\\100hz.txt"))
-            using (var csv = new CsvReader(reader, CultureInfo.InvariantCulture))
+            try
             {
-                csv.Read();
-                csv.ReadHeader();
-                while (csv.Read())
+                using (var reader = new StreamReader(@"C:\\Users\\JoseSalazar\\OneDrive - Pneuma Respiratory\\Project Development\\Product Development\\Template\\FrequencyDisplacement\\100hz.txt"))
+                using (var csv = new CsvReader(reader, CultureInfo.InvariantCulture))
                 {
-                    var record = new DhmData()
+                    csv.Read();
+                    csv.ReadHeader();
+                    while (csv.Read())
                     {
-                        Frequency = csv.GetField<double>(" Frequency[Hz]"),
-                        Displacement = csv.GetField<double>(" Region4[nm]")
-                    };
-                    groupDhmData.RawData.Add(record);
+                        var record = new DhmData()
+                        {
+                            Frequency = csv.GetField<double>(" Frequency[Hz]"),
+                            Displacement = csv.GetField<double>(" Region4[nm]")
+                        };
+                        groupDhmData.RawData.Add(record);
+                    }
                 }
+                DHMData.Add(groupDhmData);
             }
-            DHMData.Add(groupDhmData);
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message, "File Not Found", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
         }
         public ObservableCollection<GroupDhmData> DHMData
         {
