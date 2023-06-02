@@ -16,7 +16,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\..\Downloads\picosdk-c-sharp-examples-master\picosdk-c-sharp-examples-master\ps2000\PS2000CSConsole\PS2000CSConsole.csproj" />
+    <ProjectReference Include="..\PS2000CSConsole\PS2000CSConsole.csproj" />
   </ItemGroup>
 
 </Project>

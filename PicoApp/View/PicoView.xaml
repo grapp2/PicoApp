@@ -21,7 +21,7 @@
                 <Label Content="Pico Scope Automation" FontSize="20"/>
                 <StackPanel Orientation="Horizontal">
                     <StackPanel>
-                        <Button Command="{Binding }"
+                        <Button Command="{Binding }"/>
                     </StackPanel>
                     <ListView ItemsSource="{Binding PicoData}" SelectedItem="{Binding SelectedPicoData}">
                         <ListView.Resources>
