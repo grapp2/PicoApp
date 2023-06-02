@@ -15,8 +15,4 @@
     <PackageReference Include="Prism.Core" Version="8.1.97" />
   </ItemGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\PS2000CSConsole\PS2000CSConsole.csproj" />
-  </ItemGroup>
-
 </Project>
