@@ -7,15 +7,21 @@
         xmlns:v="clr-namespace:PicoApp.View"
         xmlns:vm="clr-namespace:PicoApp.ViewModel"
         mc:Ignorable="d"
-        Title="MainWindow">
+        Title="MainWindow"
+        xmlns:i="http://schemas.microsoft.com/xaml/behaviors">
     <Window.DataContext>
         <vm:MainWindowViewModel/>
     </Window.DataContext>
+    <i:Interaction.Triggers>
+        <i:EventTrigger EventName="Closing">
+            <i:CallMethodAction MethodName="OnWindowClosing" TargetObject="{Binding}" />
+        </i:EventTrigger>
+    </i:Interaction.Triggers>
     <StackPanel>
-        <ContentControl Content="{Binding PicoViewModel}">
+        <ContentControl Content="{Binding OscopeViewModel}">
             <ContentControl.Resources>
-                <DataTemplate DataType="{x:Type vm:PicoViewModel}">
-                    <v:PicoView/>
+                <DataTemplate DataType="{x:Type vm:OscopeViewModel}">
+                    <v:OscopeView/>
                 </DataTemplate>
             </ContentControl.Resources>
         </ContentControl>

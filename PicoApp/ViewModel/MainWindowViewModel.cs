@@ -1,5 +1,7 @@
-﻿using System;
+﻿using Prism.Commands;
+using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -8,19 +10,23 @@ namespace PicoApp.ViewModel
 {
     internal class MainWindowViewModel : ViewModelBase
     {
-        private PicoViewModel picoViewModel;
+        private OscopeViewModel oscopeViewModel;
         private DHMViewModel dHMViewModel;
 
         public MainWindowViewModel()
         {
-            PicoViewModel = new PicoViewModel();
+            OscopeViewModel = new OscopeViewModel();
             DHMViewModel = new DHMViewModel();
         }
-
-        public PicoViewModel PicoViewModel
+        public void OnWindowClosing(object sender, CancelEventArgs e)
         {
-            get { return picoViewModel; }
-            set { picoViewModel = value; OnPropertyChanged(); }
+            if (OscopeViewModel.NiSession == null) return;
+            OscopeViewModel.NiSession.Dispose();
+        }
+        public OscopeViewModel OscopeViewModel
+        {
+            get { return oscopeViewModel; }
+            set { oscopeViewModel = value; OnPropertyChanged(); }
         }
         public DHMViewModel DHMViewModel
         {

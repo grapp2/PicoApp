@@ -5,8 +5,8 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:PicoApp.View"
              xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
-             xmlns:oxy="http://oxyplot.org/wpf" x:Class="PicoApp.View.PicoView"
-             mc:Ignorable="d" >
+             xmlns:oxy="http://oxyplot.org/wpf" x:Class="PicoApp.View.OscopeView"
+             mc:Ignorable="d">
     <materialDesign:Card>
         <Grid>
             <Grid.ColumnDefinitions>
@@ -20,9 +20,16 @@
             <StackPanel Grid.Row="0" Grid.RowSpan="2" Grid.Column="0">
                 <Label Content="Pico Scope Automation" FontSize="20"/>
                 <StackPanel Orientation="Horizontal">
-                    <StackPanel>
-                        <Button Command="{Binding }"/>
-                    </StackPanel>
+                    <materialDesign:Card Margin="10" Padding="5">
+                        <StackPanel>
+                            <TextBlock Text="Devices"/>
+                            <ListView ItemsSource="{Binding Resources}" SelectedItem="{Binding SelectedDevice}"/>
+                            <StackPanel Orientation="Horizontal">
+                                <Button Content="Refresh" Command="{Binding RefreshDevices}"/>
+                                <Button Command="{Binding OscopeConnect}" Content="Connect"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </materialDesign:Card>
                     <ListView ItemsSource="{Binding PicoData}" SelectedItem="{Binding SelectedPicoData}">
                         <ListView.Resources>
                             <Style TargetType="{x:Type GridViewColumnHeader}" BasedOn="{StaticResource {x:Type GridViewColumnHeader}}">
@@ -35,7 +42,7 @@
                             </Style>
                         </ListView.ItemContainerStyle>
                         <ListView.View>
-                            <GridView >
+                            <GridView>
                                 <GridViewColumn Header="Voltage RMS (V)" Width="auto">
                                     <GridViewColumn.CellTemplate>
                                         <DataTemplate>

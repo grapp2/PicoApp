@@ -18,9 +18,9 @@ namespace PicoApp.View
     /// <summary>
     /// Interaction logic for PicoView.xaml
     /// </summary>
-    public partial class PicoView : UserControl
+    public partial class OscopeView : UserControl
     {
-        public PicoView()
+        public OscopeView()
         {
             InitializeComponent();
         }

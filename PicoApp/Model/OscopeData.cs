@@ -12,9 +12,9 @@ namespace PicoApp.Model
         public double Current { get; set; }
         public double Voltage { get; set; }
     }
-    internal class PicoData
+    internal class OscopeData
     {
-        public PicoData()
+        public OscopeData()
         {
             RawData = new List<WaveformData>();
         }
