@@ -11,24 +11,36 @@ using OxyPlot.Axes;
 using Prism.Commands;
 using NationalInstruments.Visa;
 using System.Windows;
+using System.Windows.Media;
+using System.Threading;
+using Ivi.Visa;
 
 namespace PicoApp.ViewModel
 {
     internal class OscopeViewModel : ViewModelBase
     {
+        CancellationTokenSource cts = new CancellationTokenSource();
+        private readonly Brush connectedColor = (Brush)Application.Current.Resources["SecondaryHueLightBrush"];
+        private readonly Brush disconnectedColor = (Brush)Application.Current.Resources["PrimaryHueLightBrush"];
+        private readonly string connectedString = "Connected";
+        private readonly string disconnectedString = "Disconnected";
         private readonly LineSeries current;
         private readonly LineSeries voltage;
-        public MessageBasedSession NiSession { get; set; }
+        private IVisaAsyncResult asyncHandle = null;
+        private Queue<string> CommandQueue = new Queue<string>();
+        List<Task> ActiveTasks = new();
         public OscopeViewModel()
         {
-            OscopeConnect = new DelegateCommand(DeviceConnect);
-            RefreshDevices = new DelegateCommand(ScanDevices);
+            Disconnected();
+            OscopeConnect = new DelegateCommand(StartAsyncConnect);
+            RefreshDevices = new DelegateCommand(StartAsyncRefresh);
+            RunClick = new DelegateCommand(QueueSetup);
+            StopClick = new DelegateCommand(StopOscope);
+            FrequencyThreshold = 200;
             Resources = new ObservableCollection<string>();
             var chart = new PlotModel { Title = "Raw Data" };
             var primaryAxis = new LinearAxis { Position = AxisPosition.Left };
-            chart.Axes.Add(primaryAxis);
             var secondaryAxis = new LinearAxis { Position = AxisPosition.Right };
-            chart.Axes.Add(secondaryAxis);
             current = new LineSeries()
             {
                 StrokeThickness = 2,
@@ -41,6 +53,8 @@ namespace PicoApp.ViewModel
                 MarkerSize = 4,
                 MarkerStroke = OxyColors.Blue
             };
+            chart.Axes.Add(primaryAxis);
+            chart.Axes.Add(secondaryAxis);
             chart.Series.Add(current);
             chart.Series.Add(voltage);
             PicoData = new ObservableCollection<OscopeData>();
@@ -51,40 +65,219 @@ namespace PicoApp.ViewModel
                 PicoData.Add(data);
             }
             PicoChart = chart;
-
             SelectedPicoData = PicoData[0];
         }
-        private void DeviceConnect()
+        private void StartAsyncConnect()
+        {
+            AnimateBar().Await();
+            DeviceConnect().Await();
+        }
+        private void StartAsyncRefresh()
+        {
+            AnimateBar().Await();
+            ScanDevices().Await();
+        }
+        private void StopOscope()
+        {
+            cts.Cancel();
+        }
+        private async Task DeviceConnect()
         {
             if (SelectedDevice == null) return;
             try
             {
+                Connecting();
                 using (var rmSession = new ResourceManager())
                 {
-                    NiSession = (MessageBasedSession)rmSession.Open(SelectedDevice);
+                    NiSession = (MessageBasedSession)await Task.Run(() => rmSession.Open(SelectedDevice));
                     // Use SynchronizeCallbacks to specify that the object marshals callbacks across threads appropriately.
                     NiSession.SynchronizeCallbacks = true;
+                    Connected();
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                Disconnected();
+            }
+            finally
+            {
+                cts.Cancel();
+            }
+        }
+        private void QueueSetup()
+        {
+            string[] setupStrings = { ":ACQuire:COUNt 1000",
+                                    ":ACQuire:TYPE AVERage",
+                                    ":TIMebase:SCALe 1e-06",
+                                    ":CHANnel1:SCALe 2 V",
+                                    ":CHANnel2:SCALe 500 mV",
+                                    ":TRIGger:EDGE:SOURce CHANNEL1",
+                                    ":TRIGger:LEVel:HIGH 2,CHANNEL1"};
+            StopEnable = true;
+            foreach (var cmd in setupStrings)
+            {
+                CommandQueue.Enqueue(cmd);
+            }
+            // start dequeueing the commands one at a time. Callback continues calling AsyncDequeueCommand until 
+            // all setup commands have been sent.
+            AsyncDequeueCommand(SetupComplete);
+        }
+        private void SetupComplete(IVisaAsyncResult result)
+        {
+            if (CommandQueue.Count > 0)
+            {
+                AsyncDequeueCommand(SetupComplete);
+            }
+            else
+            {
+                RunOscopeAsync().Await();
+            }
+        }
+        private async Task RunOscopeAsync()
+        {
+            string cmd = ":MEASure:FREQuency? CHANNEL1";
+            double lastFreq = 0;
+            while (!cts.Token.IsCancellationRequested)
+            {
+                try
+                {
+                    NiSession.RawIO.Write(cmd);
+                    MeasuredFrequency = Double.Parse(NiSession.RawIO.ReadString());
+                    if (MeasuredFrequency > lastFreq + FrequencyThreshold || MeasuredFrequency < lastFreq - FrequencyThreshold)
+                    {
+                        lastFreq = MeasuredFrequency;
+                    }
+                }
+                catch (Exception exp)
+                {
+                    MessageBox.Show(exp.Message);
+                }
+                await Task.Delay(1000);
+            }
+            cts.Dispose();
+            cts = new CancellationTokenSource();
+        }
+        /// <summary>
+        /// input callback function
+        /// </summary>
+        /// <param name="f"></param>
+        private void AsyncDequeueCommand(Action<IVisaAsyncResult> callback)
+        {
+            try
+            {
+                var cmd = CommandQueue.Dequeue();
+                asyncHandle = NiSession.RawIO.BeginWrite(
+                    cmd,
+                    new VisaAsyncCallback(callback),
+                    (object)cmd.Length);
+            }
+            catch (Exception exp)
+            {
+                MessageBox.Show(exp.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+        private void UpdateStatus()
+        {
+            if (NiSession == null) Disconnected();
+        }
+        private void Connecting()
+        {
+            StatusColor = disconnectedColor;
+            ConnectEnabled = false;
+            RefreshEnabled = false;
+            ProgressVisibility = "Visible";
+            ConnectionStatus = "Connecting...";
+        }
+        private void Refreshing()
+        {
+            ProgressVisibility = "Visible";
+            ConnectEnabled = false;
+            RefreshEnabled = false;
+            ConnectionStatus = "Refreshing...";
+        }
+        private void Connected()
+        {
+            ProgressVisibility = "Collapsed";
+            ConnectEnabled = true;
+            RefreshEnabled = true;
+            ConnectionStatus = connectedString;
+            StatusColor = connectedColor;
+        }
+        private void Disconnected()
+        {
+            ProgressVisibility = "Collapsed";
+            StatusColor = disconnectedColor;
+            RefreshEnabled = true;
+            ConnectEnabled = false;
+            ConnectionStatus = disconnectedString;
+        }
+        private async Task ScanDevices()
+        {
+            var curStatus = ConnectionStatus;
+            Refreshing();
+            try
+            {
+                Resources.Clear();
+                using (var rmSession = new ResourceManager())
+                {
+                    var devices = await Task.Run(() => rmSession.Find("(ASRL|GPIB|TCPIP|USB)?*INSTR"));
+                    foreach (string s in devices)
+                    {
+                        Resources.Add(s);
+                    }
                 }
             }
             catch (Exception ex)
             {
                 MessageBox.Show(ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
-
-        }
-        private void ScanDevices()
-        {
-            Resources.Clear();
-            using (var rmSession = new ResourceManager())
+            finally
             {
-                foreach (string s in rmSession.Find("(ASRL|GPIB|TCPIP|USB)?*INSTR"))
-                {
-                    Resources.Add(s);
-                }
-            }   
+                cts.Cancel();
+                UpdateStatus();
+            }
+        }
+        public async Task AnimateBar()
+        {
+            while (!cts.Token.IsCancellationRequested)
+            {
+                ProgressBarValue += 5;
+                await Task.Delay(200);
+            }
+            cts.Dispose();
+            cts = new CancellationTokenSource();
         }
         public DelegateCommand OscopeConnect { get; set; }
         public DelegateCommand RefreshDevices { get; set; }
+        public DelegateCommand RunClick { get; set; }
+        public DelegateCommand StopClick { get; set; }
+        private bool runEnable;
+        public bool RunEnable
+        {
+            get
+            {
+                return runEnable;
+            }
+            set
+            {
+                runEnable = value;
+                OnPropertyChanged();
+            }
+        }
+        private bool stopEnable;
+        public bool StopEnable
+        {
+            get
+            {
+                return stopEnable;
+            }
+            set
+            {
+                stopEnable = value;
+                OnPropertyChanged();
+            }
+        }
         private PlotModel picoChart;
         public PlotModel PicoChart
         {
@@ -137,9 +330,106 @@ namespace PicoApp.ViewModel
             } 
             set 
             { 
-                selectedDevice = value; 
+                selectedDevice = value;
+                if (selectedDevice == null) ConnectEnabled = false;
+                else ConnectEnabled = true;
                 OnPropertyChanged(); 
             } 
+        }
+        private bool refreshEnabled;
+        public bool RefreshEnabled
+        {
+            get { return refreshEnabled; }
+            set { refreshEnabled = value; OnPropertyChanged(); }
+        }
+        private bool connectEnabled;
+        public bool ConnectEnabled
+        {
+            get { return connectEnabled; }
+            set { connectEnabled = value; OnPropertyChanged(); }
+        }
+        private string connectionStatus;
+        public string ConnectionStatus
+        {
+            get { return connectionStatus; }
+            set { connectionStatus = value; OnPropertyChanged(); }
+        }
+        private Brush statusColor;
+        public Brush StatusColor
+        {
+            get { return statusColor; }
+            set { statusColor = value; OnPropertyChanged(); }
+        }
+        private Brush connectBorderColor;
+        public Brush ConnectBorderColor
+        {
+            get { return connectBorderColor; }
+            set { connectBorderColor = value; OnPropertyChanged(); }
+        }
+        private Brush disconnectBorderColor;
+        public Brush DisconnectBorderColor
+        {
+            get { return disconnectBorderColor; }
+            set { disconnectBorderColor = value; OnPropertyChanged(); }
+        }
+        private int progressBarValue;
+        public int ProgressBarValue
+        {
+            get { return progressBarValue; }
+            set 
+            {
+                if (progressBarValue == value) return;
+                if (value > 100 || value < 0) progressBarValue = 0;
+                else progressBarValue = value; 
+                OnPropertyChanged(); 
+            }
+        }
+        private string progressVisibility;
+        public string ProgressVisibility
+        {
+            get { return progressVisibility; }
+            set { progressVisibility = value; OnPropertyChanged(); }
+        }
+        private double measuredFrequency;
+        public double MeasuredFrequency
+        {
+            get
+            {
+                return measuredFrequency;
+            }
+            set
+            {
+                measuredFrequency = value; 
+                OnPropertyChanged();
+            }
+        }
+        private double frequencyThreshold;
+        public double FrequencyThreshold
+        {
+            get { return frequencyThreshold; }
+            set { frequencyThreshold = value; OnPropertyChanged(); }
+        }
+        private MessageBasedSession niSession;
+        public MessageBasedSession NiSession
+        {
+            get
+            {
+                return niSession;
+            }
+            set
+            {
+                niSession = value;
+                if (niSession == null)
+                {
+                    RunEnable = false;
+                    StopEnable = false;
+                }
+                else
+                {
+                    RunEnable = true;
+                    StopEnable = false;
+                }
+            }
         }
     }
 }

@@ -5,9 +5,10 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:PicoApp.View"
              xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+             xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
              xmlns:oxy="http://oxyplot.org/wpf" x:Class="PicoApp.View.OscopeView"
              mc:Ignorable="d">
-    <materialDesign:Card>
+    <materialDesign:Card Padding="5">
         <Grid>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="auto"/>
@@ -18,62 +19,88 @@
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
             <StackPanel Grid.Row="0" Grid.RowSpan="2" Grid.Column="0">
-                <Label Content="Pico Scope Automation" FontSize="20"/>
+                <TextBlock Text="Oscilloscope" Style="{StaticResource MaterialDesignHeadline4TextBlock}"/>
                 <StackPanel Orientation="Horizontal">
-                    <materialDesign:Card Margin="10" Padding="5">
+                    <materialDesign:Card Margin="0,10,0,0" Padding="5">
                         <StackPanel>
-                            <TextBlock Text="Devices"/>
-                            <ListView ItemsSource="{Binding Resources}" SelectedItem="{Binding SelectedDevice}"/>
-                            <StackPanel Orientation="Horizontal">
-                                <Button Content="Refresh" Command="{Binding RefreshDevices}"/>
-                                <Button Command="{Binding OscopeConnect}" Content="Connect"/>
-                            </StackPanel>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Devices" Style="{StaticResource MaterialDesignHeadline5TextBlock}"/>
+                                <Button Grid.Column="2" Command="{Binding RefreshDevices}" IsEnabled="{Binding RefreshEnabled}">
+                                    <Button.Content>
+                                        <StackPanel Orientation="Horizontal">
+                                            <materialDesign:PackIcon Kind="Refresh"/>
+                                        </StackPanel>
+                                    </Button.Content>
+                                </Button>
+                            </Grid>
+                            <ListView Height="150" Width="250" ItemsSource="{Binding Resources}" SelectedItem="{Binding SelectedDevice}" Margin="0,10,0,0"/>
+                            <Button Command="{Binding OscopeConnect}" Content="Connect" Margin="10" IsEnabled="{Binding ConnectEnabled}"/>
+                            <TextBlock Text="Status" Style="{StaticResource MaterialDesignHeadline5TextBlock}"/>
+                            <materialDesign:Card Margin="5" Padding="5" Background="{Binding StatusColor}">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding ConnectionStatus}" Padding="5" Style="{StaticResource MaterialDesignHelperTextBlock}" Background="{StaticResource MaterialDesignCardBackground}"/>
+                                    <ProgressBar Value="{Binding ProgressBarValue}" Visibility="{Binding ProgressVisibility}"/>
+                                </StackPanel>
+                            </materialDesign:Card>
                         </StackPanel>
                     </materialDesign:Card>
-                    <ListView ItemsSource="{Binding PicoData}" SelectedItem="{Binding SelectedPicoData}">
-                        <ListView.Resources>
-                            <Style TargetType="{x:Type GridViewColumnHeader}" BasedOn="{StaticResource {x:Type GridViewColumnHeader}}">
-                                <Setter Property="HorizontalContentAlignment" Value="Center" />
-                            </Style>
-                        </ListView.Resources>
-                        <ListView.ItemContainerStyle>
-                            <Style TargetType="{x:Type ListViewItem}">
-                                <Setter Property="HorizontalContentAlignment" Value="Center" />
-                            </Style>
-                        </ListView.ItemContainerStyle>
-                        <ListView.View>
-                            <GridView>
-                                <GridViewColumn Header="Voltage RMS (V)" Width="auto">
-                                    <GridViewColumn.CellTemplate>
-                                        <DataTemplate>
-                                            <TextBlock Text="{Binding VoltageRMS, StringFormat=\{0:F2\}}"/>
-                                        </DataTemplate>
-                                    </GridViewColumn.CellTemplate>
-                                </GridViewColumn>
-                                <GridViewColumn Header="Current RMS (A)" Width="auto">
-                                    <GridViewColumn.CellTemplate>
-                                        <DataTemplate>
-                                            <TextBlock Text="{Binding CurrentRMS, StringFormat=\{0:F2\}}"/>
-                                        </DataTemplate>
-                                    </GridViewColumn.CellTemplate>
-                                </GridViewColumn>
-                                <GridViewColumn Header="Phase" Width="auto">
-                                    <GridViewColumn.CellTemplate>
-                                        <DataTemplate>
-                                            <TextBlock Text="{Binding Phase, StringFormat=\{0:F2\}}"/>
-                                        </DataTemplate>
-                                    </GridViewColumn.CellTemplate>
-                                </GridViewColumn>
-                                <GridViewColumn Header="Power" Width="auto">
-                                    <GridViewColumn.CellTemplate>
-                                        <DataTemplate>
-                                            <TextBlock Text="{Binding Power, StringFormat=\{0:F2\}}"/>
-                                        </DataTemplate>
-                                    </GridViewColumn.CellTemplate>
-                                </GridViewColumn>
-                            </GridView>
-                        </ListView.View>
-                    </ListView>
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBox Margin="5" Text="{Binding FrequencyThreshold, UpdateSourceTrigger=PropertyChanged}" Width="200" Style="{StaticResource MaterialDesignFloatingHintTextBox}" materialDesign:HintAssist.Hint="Frequency Threshold (Hz)"/>
+                            <Button Margin="5" Content="Run" Command="{Binding RunClick}" IsEnabled="{Binding RunEnable}"/>
+                            <Button Margin="5" Content="Stop" Command="{Binding StopClick}" IsEnabled="{Binding StopEnable}"/>
+                            <TextBlock Text="{Binding MeasuredFrequency}"/>
+                        </StackPanel>
+                        <ListView ItemsSource="{Binding PicoData}" SelectedItem="{Binding SelectedPicoData}">
+                            <ListView.Resources>
+                                <Style TargetType="{x:Type GridViewColumnHeader}" BasedOn="{StaticResource {x:Type GridViewColumnHeader}}">
+                                    <Setter Property="HorizontalContentAlignment" Value="Center" />
+                                </Style>
+                            </ListView.Resources>
+                            <ListView.ItemContainerStyle>
+                                <Style TargetType="{x:Type ListViewItem}">
+                                    <Setter Property="HorizontalContentAlignment" Value="Center" />
+                                </Style>
+                            </ListView.ItemContainerStyle>
+                            <ListView.View>
+                                <GridView>
+                                    <GridViewColumn Header="Voltage RMS (V)" Width="auto">
+                                        <GridViewColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding VoltageRMS, StringFormat=\{0:F2\}}"/>
+                                            </DataTemplate>
+                                        </GridViewColumn.CellTemplate>
+                                    </GridViewColumn>
+                                    <GridViewColumn Header="Current RMS (A)" Width="auto">
+                                        <GridViewColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding CurrentRMS, StringFormat=\{0:F2\}}"/>
+                                            </DataTemplate>
+                                        </GridViewColumn.CellTemplate>
+                                    </GridViewColumn>
+                                    <GridViewColumn Header="Phase" Width="auto">
+                                        <GridViewColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding Phase, StringFormat=\{0:F2\}}"/>
+                                            </DataTemplate>
+                                        </GridViewColumn.CellTemplate>
+                                    </GridViewColumn>
+                                    <GridViewColumn Header="Power" Width="auto">
+                                        <GridViewColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding Power, StringFormat=\{0:F2\}}"/>
+                                            </DataTemplate>
+                                        </GridViewColumn.CellTemplate>
+                                    </GridViewColumn>
+                                </GridView>
+                            </ListView.View>
+                        </ListView>
+                    </StackPanel>
                     <oxy:PlotView Model="{Binding PicoChart}" Width="500" Height="500"/>
                 </StackPanel>
             </StackPanel>
