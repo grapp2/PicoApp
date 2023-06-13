@@ -29,6 +29,7 @@ namespace PicoApp.ViewModel
         private IVisaAsyncResult asyncHandle = null;
         private Queue<string> CommandQueue = new Queue<string>();
         List<Task> ActiveTasks = new();
+        double lastFreq = 0;
         public OscopeViewModel()
         {
             Disconnected();
@@ -80,6 +81,7 @@ namespace PicoApp.ViewModel
         private void StopOscope()
         {
             cts.Cancel();
+            if (NiSession != null) NiSession.RawIO.AbortAsyncOperation(asyncHandle);
         }
         private async Task DeviceConnect()
         {
@@ -107,62 +109,64 @@ namespace PicoApp.ViewModel
         }
         private void QueueSetup()
         {
-            string[] setupStrings = { ":ACQuire:COUNt 1000",
-                                    ":ACQuire:TYPE AVERage",
-                                    ":TIMebase:SCALe 1e-06",
-                                    ":CHANnel1:SCALe 2 V",
-                                    ":CHANnel2:SCALe 500 mV",
-                                    ":TRIGger:EDGE:SOURce CHANNEL1",
-                                    ":TRIGger:LEVel:HIGH 2,CHANNEL1"};
+            string setupString = ":ACQuire:COUNt 1000;" +
+                                    ":ACQuire:TYPE AVERage;" +
+                                    ":TIMebase:SCALe 1e-06;" +
+                                    ":CHANnel1:SCALe 2 V;" +
+                                    ":CHANnel2:SCALe 500 mV;" +
+                                    ":TRIGger:EDGE:SOURce CHANNEL;" +
+                                    "WAVeform:FORMat ASCii;" +
+                                    ":WAVeform:POINts 1000;" +
+                                    ":TRIGger:LEVel:HIGH 2,CHANNE;";
             StopEnable = true;
-            foreach (var cmd in setupStrings)
-            {
-                CommandQueue.Enqueue(cmd);
-            }
+            CommandQueue.Enqueue(setupString);
             // start dequeueing the commands one at a time. Callback continues calling AsyncDequeueCommand until 
             // all setup commands have been sent.
-            AsyncDequeueCommand(SetupComplete);
+            AsyncDequeueWrite(SetupComplete);
         }
+        private async Task RunOscopeAsync()
+        {
+            string cmd = ":MEASure:FREQuency? CHANNEL1";
+            while (!cts.Token.IsCancellationRequested)
+            {
+                CommandQueue.Enqueue(cmd);
+                // Once the write is finished, immediately read the result.
+                AsyncDequeueWrite((IVisaAsyncResult result) => AsyncRead(FrequencyReadComplete));
+                await Task.Delay(1250);
+            }
+            cts.Dispose();
+            cts = new CancellationTokenSource();
+        }
+
         private void SetupComplete(IVisaAsyncResult result)
         {
             if (CommandQueue.Count > 0)
             {
-                AsyncDequeueCommand(SetupComplete);
+                AsyncDequeueWrite(SetupComplete);
             }
             else
             {
                 RunOscopeAsync().Await();
             }
         }
-        private async Task RunOscopeAsync()
+        private void FrequencyReadComplete(IVisaAsyncResult result)
         {
-            string cmd = ":MEASure:FREQuency? CHANNEL1";
-            double lastFreq = 0;
-            while (!cts.Token.IsCancellationRequested)
+            MeasuredFrequency = Double.Parse(NiSession.RawIO.EndReadString(result));
+            if (MeasuredFrequency > lastFreq + FrequencyThreshold || MeasuredFrequency < lastFreq - FrequencyThreshold)
             {
-                try
-                {
-                    NiSession.RawIO.Write(cmd);
-                    MeasuredFrequency = Double.Parse(NiSession.RawIO.ReadString());
-                    if (MeasuredFrequency > lastFreq + FrequencyThreshold || MeasuredFrequency < lastFreq - FrequencyThreshold)
-                    {
-                        lastFreq = MeasuredFrequency;
-                    }
-                }
-                catch (Exception exp)
-                {
-                    MessageBox.Show(exp.Message);
-                }
-                await Task.Delay(1000);
+                FrequencyTrigger();
+                lastFreq = MeasuredFrequency;
             }
-            cts.Dispose();
-            cts = new CancellationTokenSource();
+        }
+        private void FrequencyTrigger()
+        {
+           
         }
         /// <summary>
-        /// input callback function
+        /// The inputted callback function is invoked when the command is returned.
         /// </summary>
         /// <param name="f"></param>
-        private void AsyncDequeueCommand(Action<IVisaAsyncResult> callback)
+        private void AsyncDequeueWrite(Action<IVisaAsyncResult> callback)
         {
             try
             {
@@ -174,7 +178,22 @@ namespace PicoApp.ViewModel
             }
             catch (Exception exp)
             {
+                if (exp.Message == "Unable to queue the asynchronous operation because there is already an operation in progress.") return;
                 MessageBox.Show(exp.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+        private void AsyncRead(Action<IVisaAsyncResult> callback)
+        {
+            try
+            {
+                asyncHandle = NiSession.RawIO.BeginRead(
+                    10000,
+                    new VisaAsyncCallback(callback),
+                    null);
+            }
+            catch (Exception exp)
+            {
+                MessageBox.Show(exp.Message);
             }
         }
         private void UpdateStatus()
@@ -307,10 +326,12 @@ namespace PicoApp.ViewModel
                 // Update graph every time selected data changes.
                 current.Points.Clear();
                 voltage.Points.Clear();
+                int i = 0;
                 foreach (var data in selectedPicoData.RawData)
                 {
-                    current.Points.Add(new DataPoint(data.Time, data.Current));
-                    voltage.Points.Add(new DataPoint(data.Time, data.Voltage));
+                    current.Points.Add(new DataPoint(i,data));
+                    voltage.Points.Add(new DataPoint(i, data));
+                    i++;
                 }
                 PicoChart.InvalidatePlot(true);
                 OnPropertyChanged();

@@ -16,9 +16,9 @@ namespace PicoApp.Model
     {
         public OscopeData()
         {
-            RawData = new List<WaveformData>();
+            RawData = new List<double>();
         }
-        public List<WaveformData> RawData { get; set; }
+        public List<double> RawData { get; set; }
         public double CurrentRMS { get; set; }
         public double VoltageRMS { get; set; }
         public double Phase { get; set; }
@@ -34,15 +34,6 @@ namespace PicoApp.Model
             VoltageRMS = rand.NextDouble();
             Phase = rand.NextDouble();
             Power = rand.NextDouble();
-            for (int i = 0; i < 50; i++)
-            {
-                RawData.Add(new WaveformData()
-                {
-                    Time = i,
-                    Voltage = rand.NextDouble(),
-                    Current = rand.NextDouble(),
-                });
-            }
         }
     }
 }
