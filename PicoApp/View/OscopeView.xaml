@@ -12,6 +12,7 @@
         <Grid>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="auto"/>
+                <ColumnDefinition Width="auto"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
             <Grid.RowDefinitions>
@@ -49,13 +50,16 @@
                             </materialDesign:Card>
                         </StackPanel>
                     </materialDesign:Card>
-                    <StackPanel>
-                        <StackPanel Orientation="Horizontal">
-                            <TextBox Margin="5" Text="{Binding FrequencyThreshold, UpdateSourceTrigger=PropertyChanged}" Width="200" Style="{StaticResource MaterialDesignFloatingHintTextBox}" materialDesign:HintAssist.Hint="Frequency Threshold (Hz)"/>
+                    <materialDesign:Card Margin="0,10,0,0" Padding="5">
+                        <StackPanel>
+                            <TextBlock Text="Parameters"  Style="{StaticResource MaterialDesignHeadline5TextBlock}"/>
+                            <TextBox Margin="5" Text="{Binding AutotuneCount}" Width="200" Style="{StaticResource MaterialDesignFloatingHintTextBox}" materialDesign:HintAssist.Hint="Number of Frequencies"/>
+                            <TextBox Margin="5" Text="{Binding NumSamples}" Width="200" Style="{StaticResource MaterialDesignFloatingHintTextBox}" materialDesign:HintAssist.Hint="Samples Per Frequency"/>
+                            <TextBox Margin="5" Text="{Binding AutotuneInterval}" Width="200" Style="{StaticResource MaterialDesignFloatingHintTextBox}" materialDesign:HintAssist.Hint="Autotune Interval (ms)"/>
                             <Button Margin="5" Content="Run" Command="{Binding RunClick}" IsEnabled="{Binding RunEnable}"/>
-                            <Button Margin="5" Content="Stop" Command="{Binding StopClick}" IsEnabled="{Binding StopEnable}"/>
-                            <TextBlock Text="{Binding MeasuredFrequency}"/>
                         </StackPanel>
+                    </materialDesign:Card>
+                    <StackPanel>
                         <ListView ItemsSource="{Binding PicoData}" SelectedItem="{Binding SelectedPicoData}">
                             <ListView.Resources>
                                 <Style TargetType="{x:Type GridViewColumnHeader}" BasedOn="{StaticResource {x:Type GridViewColumnHeader}}">
@@ -69,6 +73,13 @@
                             </ListView.ItemContainerStyle>
                             <ListView.View>
                                 <GridView>
+                                    <GridViewColumn Header="Frequency (Hz)" Width="auto">
+                                        <GridViewColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding Frequency, StringFormat=\{0:F0\}}"/>
+                                            </DataTemplate>
+                                        </GridViewColumn.CellTemplate>
+                                    </GridViewColumn>
                                     <GridViewColumn Header="Voltage RMS (V)" Width="auto">
                                         <GridViewColumn.CellTemplate>
                                             <DataTemplate>

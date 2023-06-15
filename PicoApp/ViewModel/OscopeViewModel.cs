@@ -24,49 +24,31 @@ namespace PicoApp.ViewModel
         private readonly Brush disconnectedColor = (Brush)Application.Current.Resources["PrimaryHueLightBrush"];
         private readonly string connectedString = "Connected";
         private readonly string disconnectedString = "Disconnected";
-        private readonly LineSeries current;
-        private readonly LineSeries voltage;
+        private readonly LineSeries power;
         private IVisaAsyncResult asyncHandle = null;
-        private Queue<string> CommandQueue = new Queue<string>();
         List<Task> ActiveTasks = new();
-        double lastFreq = 0;
+        int TotalSamples = 0;
         public OscopeViewModel()
         {
             Disconnected();
             OscopeConnect = new DelegateCommand(StartAsyncConnect);
             RefreshDevices = new DelegateCommand(StartAsyncRefresh);
-            RunClick = new DelegateCommand(QueueSetup);
+            RunClick = new DelegateCommand(StartScope);
             StopClick = new DelegateCommand(StopOscope);
-            FrequencyThreshold = 200;
             Resources = new ObservableCollection<string>();
             var chart = new PlotModel { Title = "Raw Data" };
             var primaryAxis = new LinearAxis { Position = AxisPosition.Left };
-            var secondaryAxis = new LinearAxis { Position = AxisPosition.Right };
-            current = new LineSeries()
+            power = new LineSeries()
             {
                 StrokeThickness = 2,
                 MarkerSize = 4,
                 MarkerStroke = OxyColors.Blue
             };
-            voltage = new LineSeries()
-            {
-                StrokeThickness = 2,
-                MarkerSize = 4,
-                MarkerStroke = OxyColors.Blue
-            };
+
             chart.Axes.Add(primaryAxis);
-            chart.Axes.Add(secondaryAxis);
-            chart.Series.Add(current);
-            chart.Series.Add(voltage);
+            chart.Series.Add(power);
             PicoData = new ObservableCollection<OscopeData>();
-            for (int i = 0; i < 10; i++)
-            {
-                var data = new OscopeData();
-                data.GenerateSample();
-                PicoData.Add(data);
-            }
             PicoChart = chart;
-            SelectedPicoData = PicoData[0];
         }
         private void StartAsyncConnect()
         {
@@ -94,6 +76,7 @@ namespace PicoApp.ViewModel
                     NiSession = (MessageBasedSession)await Task.Run(() => rmSession.Open(SelectedDevice));
                     // Use SynchronizeCallbacks to specify that the object marshals callbacks across threads appropriately.
                     NiSession.SynchronizeCallbacks = true;
+                    NiSession.TimeoutMilliseconds = 1000;
                     Connected();
                 }
             }
@@ -107,74 +90,154 @@ namespace PicoApp.ViewModel
                 cts.Cancel();
             }
         }
-        private void QueueSetup()
+        private void StartScope()
         {
-            string setupString = ":ACQuire:COUNt 1000;" +
-                                    ":ACQuire:TYPE AVERage;" +
-                                    ":TIMebase:SCALe 1e-06;" +
-                                    ":CHANnel1:SCALe 2 V;" +
-                                    ":CHANnel2:SCALe 500 mV;" +
-                                    ":TRIGger:EDGE:SOURce CHANNEL;" +
-                                    "WAVeform:FORMat ASCii;" +
-                                    ":WAVeform:POINts 1000;" +
-                                    ":TRIGger:LEVel:HIGH 2,CHANNE;";
-            StopEnable = true;
-            CommandQueue.Enqueue(setupString);
-            // start dequeueing the commands one at a time. Callback continues calling AsyncDequeueCommand until 
-            // all setup commands have been sent.
-            AsyncDequeueWrite(SetupComplete);
+            ScopeScheduler().Await();
         }
-        private async Task RunOscopeAsync()
+        private async Task ScopeScheduler()
         {
-            string cmd = ":MEASure:FREQuency? CHANNEL1";
-            while (!cts.Token.IsCancellationRequested)
-            {
-                CommandQueue.Enqueue(cmd);
-                // Once the write is finished, immediately read the result.
-                AsyncDequeueWrite((IVisaAsyncResult result) => AsyncRead(FrequencyReadComplete));
-                await Task.Delay(1250);
-            }
-            cts.Dispose();
-            cts = new CancellationTokenSource();
+            SetupScope();
+            RunOscopeAsync();
+            await IsAcquisitionComplete();
+            PicoData = new ObservableCollection<OscopeData>(await CollectMeasurements());
+            UpdateGraph();
         }
-
-        private void SetupComplete(IVisaAsyncResult result)
+        private void SetupScope()
         {
-            if (CommandQueue.Count > 0)
+            string setupString =
+                ":ACQuire:COUNt 1000;" +
+                ":ACQuire:TYPE AVERage;" +
+                ":TIMebase:SCALe 1e-06;" +
+                ":CHANnel1:SCALe 2 V;" +
+                ":CHANnel2:SCALe 500 mV;" +
+                ":TRIGger:EDGE:SOURce CHANNEL;" +
+                "WAVeform:FORMat ASCii;" +
+                ":WAVeform:POINts 10000;" +
+                ":TRIGger:EDGE:LEVel 1,CHANNEL1;";
+            Write(setupString);
+        }
+        private void RunOscopeAsync()
+        {
+            TotalSamples = AutotuneCount * NumSamples;
+            string cmd = "ACQuire:SEGMented:COUNt " + (AutotuneCount * NumSamples).ToString() + "\n" +
+                ":TRIGger:MODE DELay\n" +
+                ":TRIGger:DELay:TRIGger:SOURce CHANNEL1\n" +
+                ":TRIGger:DELay:ARM:SOURce CHANNEL1\n" +
+                ":ACQuire:MODE SEGMented\n" +
+                ":TRIGger:DELay:TDELay:TIME " + (AutotuneInterval / 1000 / NumSamples).ToString() + "\n" +
+                ":SINGle";
+            Task.Run(() => Write(cmd));
+        }
+        private async Task IsAcquisitionComplete()
+        {
+            int operationComplete = 0;
+            string cmd = "*OPC?";
+            int timesTried = 0;
+            int maxTimesTried = 200;
+            int delayTime = 500;
+            while (operationComplete == 0 && timesTried < maxTimesTried)
             {
-                AsyncDequeueWrite(SetupComplete);
-            }
-            else
-            {
-                RunOscopeAsync().Await();
+                try
+                {
+                    timesTried++;
+                    await Task.Delay(delayTime);
+                    NiSession.RawIO.Write(cmd);
+                    operationComplete = Convert.ToInt32(NiSession.RawIO.ReadString());
+                }
+                catch
+                {
+                    // If there is an error just keep trying to send the opc query.
+                }
             }
         }
-        private void FrequencyReadComplete(IVisaAsyncResult result)
+        private async Task<List<OscopeData>> CollectMeasurements()
         {
-            MeasuredFrequency = Double.Parse(NiSession.RawIO.EndReadString(result));
-            if (MeasuredFrequency > lastFreq + FrequencyThreshold || MeasuredFrequency < lastFreq - FrequencyThreshold)
+            List<OscopeData> dataList = new List<OscopeData>();
+            await Task.Run(() =>
             {
-                FrequencyTrigger();
-                lastFreq = MeasuredFrequency;
-            }
-        }
-        private void FrequencyTrigger()
-        {
-           
+                string[] measurements =
+            {
+                ":MEASure:FREQuency? CHANNEL1",
+                ":MEASure:VRMS? DISPlay,AC,CHANNEL1",
+                ":MEASure:VRMS? DISPlay,AC,CHANNEL2",
+                ":MEASure:PHASe? CHANnel1,CHANnel2"
+            };
+                string cmd;
+                List<string> strings = new();
+                List<double> frequencies = new();
+                List<double> voltages = new();
+                List<double> currents = new();
+                List<double> phases = new();
+                OscopeData oscopeData;
+                int index = 0;
+                try
+                {
+                    for (int i = 1; i <= TotalSamples; i++)
+                    {
+                        cmd = ":ACQuire:SEGMented:INDex " + i.ToString();
+                        NiSession.RawIO.Write(cmd);
+                        foreach (string command in measurements)
+                        {
+                            cmd = command;
+                            NiSession.RawIO.Write(cmd);
+                            strings.Add(NiSession.RawIO.ReadString());
+                        }
+                    }
+                    for (int i = 0; i < AutotuneCount; i++)
+                    {
+                        oscopeData = new OscopeData();
+                        for (int j = 0; j < NumSamples; j++)
+                        {
+                            for (int k = 0; k < measurements.Count(); k++)
+                            {
+                                if (k == 0)
+                                {
+                                    frequencies.Add(Double.Parse(strings[index]));
+                                }
+                                else if (k == 1)
+                                {
+                                    voltages.Add(Double.Parse(strings[index]));
+                                }
+                                else if (k == 2)
+                                {
+                                    currents.Add(Double.Parse(strings[index]));
+                                }
+                                else if (k == 3)
+                                {
+                                    phases.Add(Double.Parse(strings[index]));
+                                }
+                                index++;
+                            }
+                        }
+                        oscopeData.Frequency = frequencies.Average();
+                        oscopeData.VoltageRMS = voltages.Average();
+                        oscopeData.CurrentRMS = currents.Average();
+                        oscopeData.Phase = phases.Average();
+                        oscopeData.CalcPower();
+                        dataList.Add(oscopeData);
+                        frequencies.Clear();
+                        voltages.Clear();
+                        currents.Clear();
+                        phases.Clear();
+                    }
+                }
+                catch (Exception e)
+                {
+                    MessageBox.Show(e.Message, "error", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            });
+            return dataList;
         }
         /// <summary>
         /// The inputted callback function is invoked when the command is returned.
         /// </summary>
         /// <param name="f"></param>
-        private void AsyncDequeueWrite(Action<IVisaAsyncResult> callback)
+        private void Write(string cmd)
         {
+            if (string.IsNullOrEmpty(cmd)) throw new Exception("Command is null.");
             try
             {
-                var cmd = CommandQueue.Dequeue();
-                asyncHandle = NiSession.RawIO.BeginWrite(
-                    cmd,
-                    new VisaAsyncCallback(callback),
-                    (object)cmd.Length);
+                NiSession.RawIO.Write(cmd);
             }
             catch (Exception exp)
             {
@@ -182,19 +245,14 @@ namespace PicoApp.ViewModel
                 MessageBox.Show(exp.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
-        private void AsyncRead(Action<IVisaAsyncResult> callback)
+        private void UpdateGraph()
         {
-            try
+            power.Points.Clear();
+            foreach (var data in PicoData)
             {
-                asyncHandle = NiSession.RawIO.BeginRead(
-                    10000,
-                    new VisaAsyncCallback(callback),
-                    null);
+                power.Points.Add(new DataPoint(data.Frequency, data.Power));
             }
-            catch (Exception exp)
-            {
-                MessageBox.Show(exp.Message);
-            }
+            PicoChart.InvalidatePlot(true);
         }
         private void UpdateStatus()
         {
@@ -284,19 +342,6 @@ namespace PicoApp.ViewModel
                 OnPropertyChanged();
             }
         }
-        private bool stopEnable;
-        public bool StopEnable
-        {
-            get
-            {
-                return stopEnable;
-            }
-            set
-            {
-                stopEnable = value;
-                OnPropertyChanged();
-            }
-        }
         private PlotModel picoChart;
         public PlotModel PicoChart
         {
@@ -323,17 +368,6 @@ namespace PicoApp.ViewModel
             set
             {
                 selectedPicoData = value;
-                // Update graph every time selected data changes.
-                current.Points.Clear();
-                voltage.Points.Clear();
-                int i = 0;
-                foreach (var data in selectedPicoData.RawData)
-                {
-                    current.Points.Add(new DataPoint(i,data));
-                    voltage.Points.Add(new DataPoint(i, data));
-                    i++;
-                }
-                PicoChart.InvalidatePlot(true);
                 OnPropertyChanged();
             }
         }
@@ -411,25 +445,6 @@ namespace PicoApp.ViewModel
             get { return progressVisibility; }
             set { progressVisibility = value; OnPropertyChanged(); }
         }
-        private double measuredFrequency;
-        public double MeasuredFrequency
-        {
-            get
-            {
-                return measuredFrequency;
-            }
-            set
-            {
-                measuredFrequency = value; 
-                OnPropertyChanged();
-            }
-        }
-        private double frequencyThreshold;
-        public double FrequencyThreshold
-        {
-            get { return frequencyThreshold; }
-            set { frequencyThreshold = value; OnPropertyChanged(); }
-        }
         private MessageBasedSession niSession;
         public MessageBasedSession NiSession
         {
@@ -443,14 +458,37 @@ namespace PicoApp.ViewModel
                 if (niSession == null)
                 {
                     RunEnable = false;
-                    StopEnable = false;
                 }
                 else
                 {
                     RunEnable = true;
-                    StopEnable = false;
                 }
             }
+        }
+        private int autotuneCount;
+        public int AutotuneCount
+        {
+            get { return autotuneCount; }
+            set { autotuneCount = value; OnPropertyChanged(); }
+        }
+        private double autotuneInterval;
+        public double AutotuneInterval
+        {
+            get
+            {
+                return autotuneInterval;
+            }
+            set
+            {
+                autotuneInterval = value;
+                OnPropertyChanged();
+            }
+        }
+        private int numSamples;
+        public int NumSamples
+        {
+            get { return numSamples; }
+            set { numSamples = value; OnPropertyChanged(); }
         }
     }
 }

@@ -19,13 +19,14 @@ namespace PicoApp.Model
             RawData = new List<double>();
         }
         public List<double> RawData { get; set; }
+        public double Frequency { get; set; }
         public double CurrentRMS { get; set; }
         public double VoltageRMS { get; set; }
         public double Phase { get; set; }
         public double Power { get; set; }
         public void CalcPower()
         {
-            Power = VoltageRMS * CurrentRMS * Math.Cos(Phase);
+            Power = VoltageRMS * CurrentRMS * Math.Cos(Phase * Math.PI / 180);
         }
         public void GenerateSample()
         {
