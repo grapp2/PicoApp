@@ -130,25 +130,30 @@ namespace PicoApp.ViewModel
         }
         private async Task IsAcquisitionComplete()
         {
-            int operationComplete = 0;
-            string cmd = "*OPC?";
             int timesTried = 0;
             int maxTimesTried = 200;
             int delayTime = 500;
-            while (operationComplete == 0 && timesTried < maxTimesTried)
+            await Task.Delay(delayTime);
+            await Task.Run(() =>
             {
-                try
+                int operationComplete = 0;
+                string cmd = "*OPC?";
+
+                while (operationComplete == 0 && timesTried < maxTimesTried)
                 {
-                    timesTried++;
-                    await Task.Delay(delayTime);
-                    NiSession.RawIO.Write(cmd);
-                    operationComplete = Convert.ToInt32(NiSession.RawIO.ReadString());
+                    try
+                    {
+                        timesTried++;
+                        NiSession.RawIO.Write(cmd);
+                        operationComplete = Convert.ToInt32(NiSession.RawIO.ReadString());
+                    }
+                    catch
+                    {
+                        // If there is an error just keep trying to send the opc query.
+                    }
                 }
-                catch
-                {
-                    // If there is an error just keep trying to send the opc query.
-                }
-            }
+            });
+
         }
         private async Task<List<OscopeData>> CollectMeasurements()
         {

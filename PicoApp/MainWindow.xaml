@@ -17,20 +17,23 @@
             <i:CallMethodAction MethodName="OnWindowClosing" TargetObject="{Binding}" />
         </i:EventTrigger>
     </i:Interaction.Triggers>
-    <StackPanel>
-        <ContentControl Content="{Binding OscopeViewModel}">
-            <ContentControl.Resources>
-                <DataTemplate DataType="{x:Type vm:OscopeViewModel}">
-                    <v:OscopeView/>
-                </DataTemplate>
-            </ContentControl.Resources>
-        </ContentControl>
-        <ContentControl Content="{Binding DHMViewModel}">
-            <ContentControl.Resources>
-                <DataTemplate DataType="{x:Type vm:DHMViewModel}">
-                    <v:DHMView/>
-                </DataTemplate>
-            </ContentControl.Resources>
-        </ContentControl>
-    </StackPanel>
+    <ScrollViewer>
+        <StackPanel>
+            <ContentControl Content="{Binding OscopeViewModel}">
+                <ContentControl.Resources>
+                    <DataTemplate DataType="{x:Type vm:OscopeViewModel}">
+                        <v:OscopeView/>
+                    </DataTemplate>
+                </ContentControl.Resources>
+            </ContentControl>
+            <ContentControl Content="{Binding DHMViewModel}">
+                <ContentControl.Resources>
+                    <DataTemplate DataType="{x:Type vm:DHMViewModel}">
+                        <v:DHMView/>
+                    </DataTemplate>
+                </ContentControl.Resources>
+            </ContentControl>
+        </StackPanel>
+    </ScrollViewer>
+
 </Window>
