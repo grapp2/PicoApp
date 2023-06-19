@@ -44,7 +44,7 @@ namespace PicoApp.ViewModel
                 MarkerSize = 4,
                 MarkerStroke = OxyColors.Blue
             };
-
+            power.Title = "";
             chart.Axes.Add(primaryAxis);
             chart.Series.Add(power);
             PicoData = new ObservableCollection<OscopeData>();
@@ -63,6 +63,7 @@ namespace PicoApp.ViewModel
         private void StopOscope()
         {
             cts.Cancel();
+            cts = new CancellationTokenSource();
             if (NiSession != null) NiSession.RawIO.AbortAsyncOperation(asyncHandle);
         }
         private async Task DeviceConnect()
@@ -88,6 +89,7 @@ namespace PicoApp.ViewModel
             finally
             {
                 cts.Cancel();
+                cts = new CancellationTokenSource();
             }
         }
         private void StartScope()
@@ -317,6 +319,7 @@ namespace PicoApp.ViewModel
             finally
             {
                 cts.Cancel();
+                cts = new CancellationTokenSource();
                 UpdateStatus();
             }
         }
