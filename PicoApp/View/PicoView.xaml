@@ -67,7 +67,7 @@
                             </GridView>
                         </ListView.View>
                     </ListView>
-                    <oxy:PlotView Model="{Binding PicoChart}" Width="500" Height="500"/>
+                    <oxy:PlotView Model="{Binding PicoChart}" Width="300" Height="300"/>
                 </StackPanel>
             </StackPanel>
         </Grid>
